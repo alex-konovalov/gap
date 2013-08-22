@@ -1,21 +1,30 @@
 JOBS=4
 GMP=yes
 GC=boehm-tl
+MPI_GC=boehm
+GCBLKSIZE=8192
+GCMAXTHREADS=
 WARD=../ward
 SCONS=bin/scons
 CFLAGS=
 DEBUG=debugguards=1 cflags=-"DTRACK_CREATOR $(CFLAGS)"
-ZMQ=no
+ZMQ=yes
 COMPILER=
 CPP_COMPILER=
 BUILD=$(SCONS) -j $(JOBS) ward=$(WARD) gc=$(GC) gmp=$(GMP) zmq=$(ZMQ) \
+	gcblksize=$(GCBLKSIZE) gcmaxthreads=$(GCMAXTHREADS) \
+	cflags=$(CFLAGS) compiler=$(COMPILER) cpp_compiler=$(CPP_COMPILER)
+MPI_BUILD=$(SCONS) -j $(JOBS) ward=$(WARD) gc=$(MPI_GC) gmp=$(GMP) zmq=$(ZMQ) \
 	cflags=$(CFLAGS) compiler=$(COMPILER) cpp_compiler=$(CPP_COMPILER)
 
 all opt: $(WARD)/bin/ward
 	$(BUILD) debug=0
 
+mpidebug: $(WARD)/bin/ward
+	$(MPI_BUILD) abi=64 mpi=$(MPIHOME) gc=boehm debug=1 $(DEBUG)
+
 gapdebug: $(WARD)/bin/ward
-	$(BUILD) debug=0 $(DEBUG) 
+	$(MPI_BUILD) debug=0 $(DEBUG) 
 
 debug: $(WARD)/bin/ward
 	$(BUILD) debug=1 $(DEBUG) 
@@ -47,11 +56,15 @@ config32:
 config64:
 	$(BUILD) abi=64 config
 
+mpi:
+	@$(MPI_BUILD) abi=64 mpi=$(MPIHOME)
+
+
 clean:
 	$(SCONS) -c preprocess=dummy compiler=$(COMPILER)
 
 distclean:
-	-rm -rf bin/current/*
+	-rm -rf bin/current/* build
 	$(SCONS) -c preprocess=dummy compiler=$(COMPILER); rm -rf extern/lib/* extern/include/* extern/32bit extern/64bit bin/current/*
 
 $(WARD)/bin/ward:

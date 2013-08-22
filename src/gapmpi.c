@@ -61,48 +61,6 @@ const char * Revision_gapmpi_c =
 #include <sys/resource.h>
 
 /*====================================================================
- * GAP debugging utilities (It would be nice if they were already in GAP :-) )
- */
-#if 0
-int tnum_stat( int stat ) { return TNUM_STAT(stat); }
-int tnum_expr( int expr ) { return TNUM_EXPR(expr); }
-int tnum_obj( Obj obj ) { return TNUM_OBJ(obj); }
-const Char *tnam_obj( Obj obj ) { return TNAM_OBJ(obj); }
-Obj type_obj( Obj obj ) { return TYPE_OBJ(obj); }
-int is_reflvar( int expr ) { return IS_REFLVAR(expr); }
-int is_intexpr( int expr ) { return IS_INTEXPR(expr); }
-Obj curr_func() { return CURR_FUNC; }
-Obj obj_lvar( int lvar ) { return OBJ_LVAR(lvar); }
-const Char *name_lvar( int lvar ) { return NAMI_FUNC( CURR_FUNC, lvar ); }
-int narg_func(func) { return NARG_FUNC(func); } /* num arg's of func */
-int nloc_func(func) { return NLOC_FUNC(func); } /* num loc's of func */
-
-
-/* The GAP source uses many pre-processor constants:
-   These bash functions provided me with a quick lookup of constants.
-alias gap_const_table sed -e 's^#define ^define_^g' '!$' \| \
-                cat '!$' - \| /lib/cpp |grep define_ \| \
-                grep -v '^[a-zA-Z_]*('
-gap_const_table () { \
-                sed -e 's^#define ^define_^g' $1 | \
-                cat $1 - | /lib/cpp | \
-                grep define_ | \
-                sed -e 's^define_^#define ^g' | \
-                grep -v 'define *[a-zA-Z_]*(' }
-gap_fnc_table () { \
-                sed -e 's^#define ^define_^g' $1 | \
-                cat $1 - | /lib/cpp | \
-                grep define_ | \
-                sed -e 's^define_^#define ^g' | \
-                grep 'define *[a-zA-Z_]*(' }
-  IMPORTANT CASES:
-    gap_const_table code.h > code.const
-    gap_const_table objects.h > objects.const
-    gap_fnc_table exprs.h | grep EVAL_EXPR
-*/
-#endif
-
-/*====================================================================
  * Internal UNIX utilities
  * These utilities are provided to be used at GAP level, and are not
  *   easily duplicated with current GAP facilities.
@@ -112,11 +70,6 @@ Obj UNIX_MakeString( Obj self, Obj len )
 { return NEW_STRING( INT_INTOBJ(len) );
 }
 
-#if 0
-Obj ParGAP_Last( Obj self )
-{ return VAL_GVAR( Last );
-}
-#endif
 
 Obj UNIX_Chdir( Obj self, Obj string )
 { int result;
@@ -389,6 +342,7 @@ Obj MPIinit( Obj self )
       return False;
     }
   }
+
   MPI_Init(&MPIargc, &MPIargv);
   /* Init_MPIvars(); called from InitLibrary() */
   return True;
@@ -413,8 +367,10 @@ Obj MPIcomm_rank( Obj self )
 
 /* This assumes same datatype units as last receive, or MPI_CHAR if no recv */
 Obj MPIget_count( Obj self )
-{ int count;
+{ int count, b;
+  Obj bob;
   if (last_datatype == UNINITIALIZED) last_datatype = MPI_CHAR;
+  MPI_Comm_rank (MPI_COMM_WORLD, &b);
   MPI_Get_count(&last_status, last_datatype, &count);
   return INTOBJ_INT( count );
 }
@@ -488,6 +444,46 @@ Obj MPIsend( Obj self, Obj args )
 			MPI_COMM_WORLD);
   return 0;
 }
+
+Obj MPIbinsend( Obj self, Obj args )
+{ Obj buf, dest, tag, size;
+  int s,i;
+  MPIARGCHK(3, 4, MPI_Binsend( <string buf>, <int dest>, <int size>, [, <opt int tag = 0> ] ));
+  buf = ELM_LIST( args, 1 );
+  dest = ELM_LIST( args, 2 );
+  size = ELM_LIST (args, 3);
+  tag = ( LEN_LIST(args) > 3 ? ELM_LIST( args, 4 ) : 0 );
+  s = MPI_Send( ((char*)CSTR_STRING(buf)),
+            INT_INTOBJ(size), /* don't incl. \0 */
+            MPI_CHAR, INT_INTOBJ(dest), INT_INTOBJ(tag),
+            MPI_COMM_WORLD);
+  return 0;
+}
+
+Obj MPIrecv2( Obj self, Obj args )
+{ volatile Obj buf, source, tag; /* volatile to satisfy gcc compiler */
+  int count, sranje;
+  MPI_Comm_rank(MPI_COMM_WORLD, &sranje);
+  MPIARGCHK( 0, 2, MPI_Recv( <opt int source = MPI_ANY_SOURCE>[, <opt int tag = MPI_ANY_TAG> ] ) );
+  source = ( LEN_LIST(args) > 0 ? ELM_LIST( args, 1 ) :
+             INTOBJ_INT(MPI_ANY_SOURCE) );
+  tag = ( LEN_LIST(args) > 1 ? ELM_LIST( args, 2 ) :
+          INTOBJ_INT(MPI_ANY_TAG) );
+  MPI_Probe(INT_INTOBJ(source), INT_INTOBJ(tag), MPI_COMM_WORLD, &last_status);
+  MPI_Get_count(&last_status, MPI_CHAR, &count);
+  buf = NEW_STRING( count);
+  ConvString( buf );
+  /* Note GET_LEN_STRING() returns GAP string length
+     and SyStrlen(CSTR_STRING()) returns C string length (up to '\0') */
+  MPI_Recv( CSTR_STRING(buf), GET_LEN_STRING(buf),
+            MPI_CHAR,
+            INT_INTOBJ(source), INT_INTOBJ(tag), MPI_COMM_WORLD, &last_status);
+  MPI_READ_DONE();
+  /* if (last_datatype != MPI_CHAR) {
+     MPI_Get_count(&last_status, last_datatype, &count); etc. } */
+  return buf;
+}
+
 
 Obj MPIrecv( Obj self, Obj args )
 { volatile Obj buf, source, tag; /* volatile to satisfy gcc compiler */
@@ -674,7 +670,10 @@ static StructGVarFunc GVarFuncs [] = {
     { "MPI_Attr_get" , 1, "keyval", MPIattr_get, "src/gapmpi.c:MPI_Attr_get" },
     { "MPI_Abort" , 1, "errorcode", MPIabort, "src/gapmpi.c:MPI_Abort" },
     { "MPI_Send" , -1, "args", MPIsend, "src/gapmpi.c:MPI_Send" },
+
+    { "MPI_Binsend" , -1, "args", MPIbinsend, "src/gapmpi.c:MPI_Binsend" },
     { "MPI_Recv" , -1, "args", MPIrecv, "src/gapmpi.c:MPI_Recv" },
+    { "MPI_Recv2" , -1, "args", MPIrecv2, "src/gapmpi.c:MPI_Recv2" },
     { "MPI_Probe" , -1, "args", MPIprobe, "src/gapmpi.c:MPI_Probe" },
     { "MPI_Iprobe" , -1, "args", MPIiprobe, "src/gapmpi.c:MPI_Iprobe" },
 

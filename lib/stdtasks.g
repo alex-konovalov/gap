@@ -3,12 +3,12 @@
 #
 # Triggers > Tasks/Milestones > TASK_QUEUE
 
-TASK_QUEUE := ShareObj( rec (
-  ready_tasks := [],
-  workers := [],
+BindGlobal("TASK_QUEUE", ShareSpecialObj( rec (
+  ready_tasks := NewQueue(),
+  workers := NewQueue(),
   active_count := 0,
   max_active := GAPInfo.KernelInfo.NUM_CPUS,
-) );
+) ) );
 
 CURRENT_TASK := fail;
 MakeThreadLocal("CURRENT_TASK");
@@ -29,7 +29,7 @@ TASKS := AtomicRecord( rec (
 	TASKS.ExecuteTask(task, context);
 	CURRENT_TASK := fail;
 	atomic TASK_QUEUE do
-	  Add(TASK_QUEUE.workers, context);
+	  PushQueue(TASK_QUEUE.workers, context);
 	  TASK_QUEUE.active_count := TASK_QUEUE.active_count - 1;
 	od;
 	TASKS.WakeWorker();
@@ -41,15 +41,12 @@ TASKS := AtomicRecord( rec (
     local task;
     atomic TASK_QUEUE do
       while TASK_QUEUE.active_count < TASK_QUEUE.max_active and
-            Length(TASK_QUEUE.ready_tasks) > 0 do
-	task := TASK_QUEUE.ready_tasks[1];
-	Remove(TASK_QUEUE.ready_tasks, 1);
-	MigrateSingleObj(TASK_QUEUE.ready_tasks, TASK_QUEUE);
+            not EmptyQueue(TASK_QUEUE.ready_tasks) do
+	task := PopQueue(TASK_QUEUE.ready_tasks);
 	atomic task do
 	  if IsIdenticalObj(task.worker, fail) then
-	    if Length(TASK_QUEUE.workers) > 0 then
-	      task.worker := TASK_QUEUE.workers[1];
-	      Remove(TASK_QUEUE.workers, 1);
+	    if not EmptyQueue(TASK_QUEUE.workers) then
+	      task.worker := PopQueue(TASK_QUEUE.workers);
 	    else
 	      task.worker := TASKS.NewWorker();
 	    fi;
@@ -116,7 +113,7 @@ TASKS := AtomicRecord( rec (
     local context, thread;
     context := MakeWriteOnceAtomic(rec(
       semaphore := CreateSemaphore(),
-      task_container := ShareSingleObj(rec(task := fail)),
+      task_container := ShareSingleSpecialObj(rec(task := fail)),
     ));
     thread := CreateThread(TASKS.WorkerThread, context);
     context.thread := thread;
@@ -131,7 +128,7 @@ TASKS := AtomicRecord( rec (
       adopt := [],
       result := fail,
       adopt_result := fail,
-      region := NewRegion(),
+      region := NewSpecialRegion(),
       complete := false,
       started := false,
       async := false,
@@ -172,7 +169,7 @@ TASKS := AtomicRecord( rec (
   PseudoWorker := function()
     local context;
     context := MakeWriteOnceAtomic(rec(
-      region := NewRegion(),
+      region := NewSpecialRegion(),
       semaphore := CreateSemaphore(),
       thread := fail,
     ));
@@ -246,12 +243,12 @@ TASKS := AtomicRecord( rec (
     od;
     atomic task, TASK_QUEUE do
       if IsIdenticalObj(task.worker, fail) then
-	Add(TASK_QUEUE.ready_tasks, task);
+	PushQueue(TASK_QUEUE.ready_tasks, task);
 	TASKS.WakeWorker();
       else
 	tasks := [ task ];
 	MigrateSingleObj(tasks, TASK_QUEUE);
-        Add(TASK_QUEUE.ready_tasks, task, 1);
+        PushQueueFront(TASK_QUEUE.ready_tasks, task);
 	TASKS.WakeWorker();
       fi;
     od;
@@ -277,13 +274,13 @@ TASKS := AtomicRecord( rec (
     local trigger;
     atomic task, TASK_QUEUE do
       if Length(task.conditions) = 0 then
-        Add(TASK_QUEUE.ready_tasks, task);
+        PushQueue(TASK_QUEUE.ready_tasks, task);
 	TASKS.WakeWorker();
 	return;
       else
         trigger := TASKS.BuildTrigger(task, true);
 	if trigger.done then
-	  Add(TASK_QUEUE.ready_tasks, task);
+	  PushQueue(TASK_QUEUE.ready_tasks, task);
 	  TASKS.WakeWorker();
 	  return;
 	fi;
@@ -291,12 +288,14 @@ TASKS := AtomicRecord( rec (
     od;
     # We get here if we have a triggered task with
     # unmet conditions.
-    ShareObj(trigger);
+    ShareSpecialObj(trigger);
     TASKS.ActivateTrigger(trigger);
   end,
 ) );
 
-NewMilestone := function(arg)
+MakeReadOnlyGVar("TASKS");
+
+BindGlobal("NewMilestone", function(arg)
   local milestone;
   if Length(arg) = 0 then
     milestone := TASKS.NewMilestone([0]);
@@ -305,10 +304,10 @@ NewMilestone := function(arg)
   else
     milestone := TASKS.NewMilestone(arg);
   fi;
-  return ShareObj(milestone);
-end;
+  return ShareSpecialObj(milestone);
+end);
 
-ContributeToMilestone := function(milestone, contribution)
+BindGlobal("ContributeToMilestone", function(milestone, contribution)
   local trigger, notify;
   atomic milestone do
     if not contribution in milestone.targets then
@@ -328,9 +327,9 @@ ContributeToMilestone := function(milestone, contribution)
   for trigger in notify do
     TASKS.FireTrigger(trigger);
   od;
-end;
+end);
 
-AchieveMilestone := function(milestone)
+BindGlobal("AchieveMilestone", function(milestone)
   local trigger, notify;
   atomic milestone do
     milestone.achieved := CopyRegion(milestone.targets);
@@ -341,54 +340,54 @@ AchieveMilestone := function(milestone)
   for trigger in notify do
     TASKS.FireTrigger(trigger);
   od;
-end;
+end);
 
-IsMilestoneAchieved := atomic function(readonly milestone)
+BindGlobal("IsMilestoneAchieved", atomic function(readonly milestone)
   return milestone.complete;
-end;
+end);
 
-RunTask := function(arg)
+BindGlobal("RunTask", function(arg)
   local task;
   task := TASKS.NewTask(arg[1], arg{[2..Length(arg)]});
   task.started := true;
-  ShareObj(task);
+  ShareSpecialObj(task);
   TASKS.QueueTask(task);
   return task;
-end;
+end);
 
-RunAsyncTask := function(arg)
+BindGlobal("RunAsyncTask", function(arg)
   local task;
   task := TASKS.NewTask(arg[1], arg{[2..Length(arg)]});
   task.async := true;
   task.started := true;
-  ShareObj(task);
+  ShareSpecialObj(task);
   TASKS.QueueTask(task);
   return task;
-end;
+end);
 
-DelayTask := function(arg)
+BindGlobal("DelayTask", function(arg)
   local task;
   task := TASKS.NewTask(arg[1], arg{[2..Length(arg)]});
-  ShareObj(task);
+  ShareSpecialObj(task);
   return task;
-end;
+end);
 
-ExecuteTask := atomic function(readwrite task)
+BindGlobal("ExecuteTask", atomic function(readwrite task)
   if not task.started and Length(task.conditions) = 0 then
     task.started := true;
     TASKS.QueueTask(task);
   fi;
-end;
+end);
 
-MakeAsyncTask := atomic function(readwrite task)
+BindGlobal("MakeAsyncTask", atomic function(readwrite task)
   if not task.started then
     task.async := true;
   else
     Error("Cannot make a task asynchronous after it has been started");
   fi;
-end;
+end);
 
-ScheduleTask := function(arg)
+BindGlobal("ScheduleTask", function(arg)
   local cond, task, trigger;
   cond := arg[1];
   atomic readonly cond do
@@ -398,12 +397,12 @@ ScheduleTask := function(arg)
   od;
   task := TASKS.NewTask(arg[2], arg{[3..Length(arg)]});
   task.conditions := MakeReadOnlyObj(cond);
-  ShareObj(task);
+  ShareSpecialObj(task);
   TASKS.QueueTask(task);
   return task;
-end;
+end);
 
-ScheduleAsyncTask := function(arg)
+BindGlobal("ScheduleAsyncTask", function(arg)
   local cond, task, trigger;
   cond := arg[1];
   atomic readonly cond do
@@ -414,14 +413,28 @@ ScheduleAsyncTask := function(arg)
   task := TASKS.NewTask(arg[2], arg{[3..Length(arg)]});
   task.async := true;
   task.conditions := MakeReadOnlyObj(cond);
-  ShareObj(task);
+  ShareSpecialObj(task);
   TASKS.QueueTask(task);
   return task;
-end;
+end);
 
-WAIT_TASK := function(conditions, is_conjunction)
-  local task, trigger, suspend, semaphore;
+BindGlobal("WAIT_TASK", function(conditions, is_conjunction)
+  local task, trigger, suspend, semaphore, cond, pending;
   task := TASKS.CurrentTask();
+  pending := [];
+  for cond in conditions do
+    atomic cond do
+      # are we dealing with a delayed task?
+      if IsBound(cond.started) and not cond.started then
+        if Length(cond.conditions) = 0 then
+	  Add(pending, cond);
+	fi;
+      fi;
+    od;
+  od;
+  for cond in pending do
+    ExecuteTask(cond);
+  od;
   atomic task do
     suspend := not IsIdenticalObj(task.body, fail);
     task.conditions := MakeReadOnlyObj(conditions);
@@ -434,7 +447,7 @@ WAIT_TASK := function(conditions, is_conjunction)
 	TASK_QUEUE.active_count := TASK_QUEUE.active_count - 1;
       od;
     fi;
-    ShareObj(trigger);
+    ShareSpecialObj(trigger);
     TASKS.ActivateTrigger(trigger);
     while true do
       TASKS.WakeWorker();
@@ -446,19 +459,19 @@ WAIT_TASK := function(conditions, is_conjunction)
       od;
     od;
   fi;
-end;
+end);
 
-WaitTask := function(arg)
+BindGlobal("WaitTask", function(arg)
   if Length(arg) = 1 and IsThreadLocal(arg[1]) and IS_LIST(arg[1]) then
     WAIT_TASK(arg[1], true);
   else
     WAIT_TASK(arg, true);
   fi;
-end;
+end);
 
-WaitTasks := WaitTask;
+BindGlobal("WaitTasks", WaitTask);
 
-WaitAnyTask := function(arg)
+BindGlobal("WaitAnyTask", function(arg)
   local which, task, tasks;
   if Length(arg) = 1 and IsThreadLocal(arg[1]) and IS_LIST(arg[1]) then
     tasks := arg[1];
@@ -475,9 +488,9 @@ WaitAnyTask := function(arg)
     od;
     which := which + 1;
   od;
-end;
+end);
 
-TaskResult := function(task)
+BindGlobal("TaskResult", function(task)
   local complete;
   atomic readonly task do
     complete := task.complete;
@@ -494,17 +507,17 @@ TaskResult := function(task)
       return task.result;
     fi;
   od;
-end;
+end);
 
-SetTaskResult := function(result)
+BindGlobal("SetTaskResult", function(result)
   local task;
   task := TASKS.CurrentTask();
   atomic task do
     task.result := result;
   od;
-end;
+end);
 
-ImmediateTask := function(arg)
+BindGlobal("ImmediateTask", function(arg)
   local result, task;
   result := CALL_WITH_CATCH(arg[1], arg{[2..Length(arg)]});
   if Length(result) = 1 or not result[1] then
@@ -515,38 +528,38 @@ ImmediateTask := function(arg)
   else
     result := result[2];
   fi;
-  task := ShareObj (rec( started := true, complete := true, async := false,
-                  result := result, adopt_result := false ));
+  task := ShareSingleSpecialObj (rec( started := true, complete := true,
+                  async := false, result := result, adopt_result := false ));
   return task;
-end;
+end);
 
-TaskIsAsync := atomic function(readonly task)
+BindGlobal("TaskIsAsync", atomic function(readonly task)
   return task.async;
-end;
+end);
 
-TaskStarted := atomic function(readonly task)
+BindGlobal("TaskStarted", atomic function(readonly task)
   return task.started;
-end;
+end);
 
-TaskFinished := atomic function(readonly task)
+BindGlobal("TaskFinished", atomic function(readonly task)
   return task.complete;
-end;
+end);
 
-TaskCancelled := atomic function(readonly task)
+BindGlobal("TaskCancellationRequested", atomic function(readonly task)
   return task.cancel;
-end;
+end);
 
-TaskCancellationComplete := atomic function(readonly task)
+BindGlobal("TaskCancelled", atomic function(readonly task)
   return task.cancelled;
-end;
+end);
 
-CancelTask := atomic function(readwrite task)
+BindGlobal("CancelTask", atomic function(readwrite task)
   if not task.complete then
     task.cancel := true;
   fi;
-end;
+end);
 
-OnTaskCancellation := function(exit)
+BindGlobal("OnTaskCancellation", function(exit)
   local task, cancel, result;
   task := TASKS.CurrentTask();
   atomic task do
@@ -566,28 +579,28 @@ OnTaskCancellation := function(exit)
     fi;
     JUMP_TO_CATCH(0);
   fi;
-end;
+end);
 
-OnTaskCancellationReturn := function(value)
+BindGlobal("OnTaskCancellationReturn", function(value)
   OnTaskCancellation(->value);
-end;
+end);
 
 
-TaskInfo := atomic function(readonly task)
+BindGlobal("TaskInfo", atomic function(readonly task)
   return CopyRegion(task);
-end;
+end);
 
-SetMaxTaskWorkers := function(count)
+BindGlobal("SetMaxTaskWorkers", function(count)
   atomic TASK_QUEUE do
     TASK_QUEUE.max_active := count;
   od;
-end;
+end);
 
-RunningTasks := function()
+BindGlobal("RunningTasks", function()
   atomic TASK_QUEUE do
     return TASK_QUEUE.active_count;
   od;
-end;
+end);
 
-CullIdleTasks := function()
-end;
+BindGlobal("CullIdleTasks", function()
+end);

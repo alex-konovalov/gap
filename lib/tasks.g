@@ -10,7 +10,8 @@ BindGlobal ("TASK_MANAGER_REQUESTS", MakeReadOnly (rec (
         FINISH_WORKER := 8,
         START_WORKERS := 9)));
 
-Tasks := AtomicRecord( rec ( Initial := GAPInfo.KernelInfo.NUM_CPUS ,    # initial number of worker threads
+Tasks := AtomicRecord( rec ( #Initial := GAPInfo.KernelInfo.NUM_CPUS ,    # initial number of worker threads
+                 Initial := 1,
                  ReportErrors := true,
                  FirstTask := true,
                  WorkerPool := CreateChannel(),                # pool of idle workers                 
@@ -18,7 +19,7 @@ Tasks := AtomicRecord( rec ( Initial := GAPInfo.KernelInfo.NUM_CPUS ,    # initi
                  WorkerSuspensionRequests := CreateChannel(),
                  InputChannels := AtomicList([])));  # suspend requests from task manager
 
-TaskData := ShareObj( rec(
+TaskData := ShareSpecialObj( rec(
                     TaskPool := [],                               # task pool (list)
                     TaskPoolLen := 0,         # length of a task pool     
                     Running := 0));
@@ -29,7 +30,7 @@ DeclareGlobalVariable ("TaskManager");
 MakeReadWriteGVar("TaskManager");
 DeclareGlobalVariable ("mainThreadChannels");
 MakeReadWriteGVar("mainThreadChannels");
-
+MakeThreadLocal("threadId");
 
 GetWorkerInputChannel := function (worker)
   local toReturn;
@@ -60,6 +61,7 @@ Tasks.Worker := function(channels)
         suspend, unSuspend, p, task, i;
   
   Tasks.InputChannels[ThreadID(CurrentThread())+1] := channels.toworker;
+  threadId := ThreadID(CurrentThread());
   
   while true do
     
@@ -181,6 +183,7 @@ end;
 # Tasks.Initialize just fires off the task manager.
 Tasks.Initialize := function()
   local i;
+  threadId := 0;
   TaskManager := CreateThread(Tasks.TaskManagerFunc);
   MakeReadOnlyGVar ("TaskManager");
   mainThreadChannels := rec ( toworker := CreateChannel(1),
@@ -201,7 +204,7 @@ Tasks.CreateTask := function(arglist)
     if IsThreadLocal(args[i]) then
       adopt[i] := true;
       if not adopted then
-        args[i] := ShareObj(CLONE_REACHABLE(args[i]));
+        args[i] := ShareSpecialObj(CLONE_REACHABLE(args[i]));
         ds := RegionOf(args[i]);
         p := LOCK(args[i]);
         adopted := true;
@@ -216,7 +219,7 @@ Tasks.CreateTask := function(arglist)
     UNLOCK(p);
   fi;
   
-  task :=  ShareObj (rec (
+  task :=  ShareSpecialObj (rec (
                    func := arglist[1],
                    args := args,
                    adopt := adopt,
@@ -304,7 +307,7 @@ ImmediateTask := function(arg)
   else
     result := result[2];
   fi;
-  task := ShareObj (rec( started := true, complete := true, async := false,
+  task := ShareSpecialObj (rec( started := true, complete := true, async := false,
                   result := result, adopt_result := false ));
   return task;
 end;

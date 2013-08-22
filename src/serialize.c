@@ -492,6 +492,70 @@ Obj DeserializeList(UInt tnum) {
   return result;
 }
 
+void SerializeObjSet(Obj obj) {
+  UInt i, j, len;
+  if (SerializedAlready(obj))
+    return;
+  len = (UInt)(ADDR_OBJ(obj)[OBJSET_USED]);
+  WriteTNum(TNUM_OBJ(obj));
+  WriteImmediateObj(INTOBJ_INT(len));
+  len = (UInt)(ADDR_OBJ(obj)[OBJSET_SIZE]);
+  for (i=0; i<len; i++) {
+    Obj el = ADDR_OBJ(obj)[OBJSET_HDRSIZE+i];
+    if (!el || el == Undefined)
+      continue;
+    if (IsBasicObj(el))
+      SerializeObj(el);
+    else {
+      PushObj(el);
+    }
+  }
+}
+
+Obj DeserializeObjSet(UInt tnum) {
+  UInt i, len = INT_INTOBJ(ReadImmediateObj());
+  Obj result = NewObjSet();
+  PushObj(result);
+  for (i=1; i<=len; i++)
+    AddObjSet(result, DeserializeObj());
+  return result;
+}
+
+void SerializeObjMap(Obj obj) {
+  UInt i, j, len;
+  if (SerializedAlready(obj))
+    return;
+  len = (UInt)(ADDR_OBJ(obj)[OBJSET_USED]);
+  WriteTNum(TNUM_OBJ(obj));
+  WriteImmediateObj(INTOBJ_INT(len));
+  len = (UInt)(ADDR_OBJ(obj)[OBJSET_SIZE]);
+  for (i=0; i<len; i++) {
+    Obj key = ADDR_OBJ(obj)[OBJSET_HDRSIZE+2*i];
+    Obj val = ADDR_OBJ(obj)[OBJSET_HDRSIZE+2*i+1];
+    if (!key || key == Undefined)
+      continue;
+    if (IsBasicObj(key) && IsBasicObj(val)) {
+      SerializeObj(key);
+      SerializeObj(val);
+    } else {
+      PushObj(val);
+      PushObj(key);
+    }
+  }
+}
+
+Obj DeserializeObjMap(UInt tnum) {
+  UInt i, len = INT_INTOBJ(ReadImmediateObj());
+  Obj result = NewObjSet();
+  PushObj(result);
+  for (i=1; i<=len; i++) {
+    Obj key = DeserializeObj();
+    Obj val = DeserializeObj();
+    AddObjMap(result, key, val);
+  }
+  return result;
+}
+
 void SerializeRecord(Obj obj) {
   UInt i, j, len;
   if (SerializedAlready(obj))
@@ -716,7 +780,7 @@ Obj DeserializeTypedObj(UInt tnum) {
       break;
     default:
       DeserializationError();
-      return; /* flow control hint */
+      return (Obj) 0; /* flow control hint */
   }
   namelen = ReadByteBlockLength();
   name = NEW_STRING(namelen);
@@ -1051,6 +1115,9 @@ static Int InitKernel (
     RegisterSerializerFunctions(typed_serializable_tnums[i],
         SerializeTypedObj, DeserializeTypedObj);
   }
+
+  RegisterSerializerFunctions(T_OBJSET, SerializeObjSet, DeserializeObjSet);
+  RegisterSerializerFunctions(T_OBJMAP, SerializeObjMap, DeserializeObjMap);
 
   RegisterSerializerFunctions(T_BACKREF, SerializeError, DeserializeBackRef);
 

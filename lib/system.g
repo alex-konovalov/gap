@@ -45,7 +45,7 @@ BIND_GLOBAL( "GAPInfo", AtomicRecord(rec(
     AtExitFuncs:= [],
     PostRestoreFuncs:= [],
 
-    TestData:= ThreadLocal( rec() ),
+    TestData:= ThreadLocalRecord( rec() ),
 
     # admissible command line options
     # (name of the option, default value, descr. strings for help page;
@@ -59,6 +59,7 @@ BIND_GLOBAL( "GAPInfo", AtomicRecord(rec(
       [ "n", false, "prevent line editing" ],
       [ "S", false, "disable/enable multi-threaded interface" ],
       [ "P", "0","<num>", "set number of logical processors" ],
+      [ "G", "0","<num>", "set number of GC threads" ],
       [ "Z", false, "enforce ordering of region locks" ],
       [ "E", true, "disable/enable use of readline library (if possible)" ],
       [ "x", "", "<num>", "set line width" ],

@@ -1880,9 +1880,9 @@ static Obj InspectChannel(Channel *channel)
   LockChannel(channel);
   result = NEW_PLIST(T_PLIST, channel->size/2);
   SET_LEN_PLIST(result, channel->size/2);
-  for (i = 0, p = channel->head; i < channel->size; i+=2) {
+  for (i = 0, p = channel->head; i < channel->size; i++) {
     SET_ELM_PLIST(result, i+1, ELM_PLIST(channel->queue, p+1));
-    p++;
+    p+=2;
     if (p == channel->capacity)
       p = 0;
   }
@@ -2732,8 +2732,8 @@ Obj FuncSHARE_NORECURSE(Obj self, Obj obj, Obj name, Obj prec)
   Obj reachable;
   if (name != Fail && !IsStringConv(name))
     ArgumentError("SHARE_RAW: Second argument must be a string or fail");
-  if (!IS_INTOBJ(prec) || INT_INTOBJ(prec) < 0)
-    ArgumentError("SHARE_RAW: Third argument must be a non-negative integer");
+  if (!IS_INTOBJ(prec))
+    ArgumentError("SHARE_RAW: Third argument must be an integer");
   region->prec = INT_INTOBJ(prec);
   if (!MigrateObjects(1, &obj, region, 0))
     ArgumentError("SHARE_NORECURSE: Thread does not have exclusive access to objects");
@@ -2744,10 +2744,10 @@ Obj FuncSHARE_NORECURSE(Obj self, Obj obj, Obj name, Obj prec)
 
 Obj FuncMIGRATE_NORECURSE(Obj self, Obj obj, Obj target)
 {
-  Region *targetDS = GetRegionOf(target);
-  if (!targetDS || IsLocked(targetDS) != 1)
+  Region *target_region = GetRegionOf(target);
+  if (!target_region || IsLocked(target_region) != 1)
     ArgumentError("MIGRATE_NORECURSE: Thread does not have exclusive access to target region");
-  if (!MigrateObjects(1, &obj, targetDS, 0))
+  if (!MigrateObjects(1, &obj, target_region, 0))
     ArgumentError("MIGRATE_NORECURSE: Thread does not have exclusive access to object");
   return obj;
 }
@@ -2785,8 +2785,8 @@ Obj FuncNEW_REGION(Obj self, Obj name, Obj prec)
   Region *region = NewRegion();
   if (name != Fail && !IsStringConv(name))
     ArgumentError("NEW_REGION: Second argument must be a string or fail");
-  if (!IS_INTOBJ(prec) || INT_INTOBJ(prec) < 0)
-    ArgumentError("NEW_REGION: Third argument must be a non-negative integer");
+  if (!IS_INTOBJ(prec))
+    ArgumentError("NEW_REGION: Third argument must be an integer");
   region->prec = INT_INTOBJ(prec);
   if (name != Fail)
     SetRegionName(region, name);
@@ -2799,8 +2799,8 @@ Obj FuncSHARE(Obj self, Obj obj, Obj name, Obj prec)
   Obj reachable;
   if (name != Fail && !IsStringConv(name))
     ArgumentError("SHARE: Second argument must be a string or fail");
-  if (!IS_INTOBJ(prec) || INT_INTOBJ(prec) < 0)
-    ArgumentError("SHARE: Third argument must be a non-negative integer");
+  if (!IS_INTOBJ(prec))
+    ArgumentError("SHARE: Third argument must be an integer");
   region->prec = INT_INTOBJ(prec);
   reachable = ReachableObjectsFrom(obj);
   if (!MigrateObjects(LEN_PLIST(reachable),
@@ -2817,8 +2817,8 @@ Obj FuncSHARE_RAW(Obj self, Obj obj, Obj name, Obj prec)
   Obj reachable;
   if (name != Fail && !IsStringConv(name))
     ArgumentError("SHARE_RAW: Second argument must be a string or fail");
-  if (!IS_INTOBJ(prec) || INT_INTOBJ(prec) < 0)
-    ArgumentError("SHARE_RAW: Third argument must be a non-negative integer");
+  if (!IS_INTOBJ(prec))
+    ArgumentError("SHARE_RAW: Third argument must be an integer");
   region->prec = INT_INTOBJ(prec);
   reachable = ReachableObjectsFrom(obj);
   if (!MigrateObjects(LEN_PLIST(reachable),
@@ -2849,26 +2849,26 @@ Obj FuncMAKE_PUBLIC(Obj self, Obj obj)
 
 Obj FuncMIGRATE(Obj self, Obj obj, Obj target)
 {
-  Region *targetDS = GetRegionOf(target);
+  Region *target_region = GetRegionOf(target);
   Obj reachable;
-  if (!targetDS || IsLocked(targetDS) != 1)
+  if (!target_region || IsLocked(target_region) != 1)
     ArgumentError("MIGRATE: Thread does not have exclusive access to target region");
   reachable = ReachableObjectsFrom(obj);
   if (!MigrateObjects(LEN_PLIST(reachable),
-       ADDR_OBJ(reachable)+1, targetDS, 1))
+       ADDR_OBJ(reachable)+1, target_region, 1))
     ArgumentError("MIGRATE: Thread does not have exclusive access to objects");
   return obj;
 }
 
 Obj FuncMIGRATE_RAW(Obj self, Obj obj, Obj target)
 {
-  Region *targetDS = GetRegionOf(target);
+  Region *target_region = GetRegionOf(target);
   Obj reachable;
-  if (!targetDS || IsLocked(targetDS) != 1)
+  if (!target_region || IsLocked(target_region) != 1)
     ArgumentError("MIGRATE: Thread does not have exclusive access to target region");
   reachable = ReachableObjectsFrom(obj);
   if (!MigrateObjects(LEN_PLIST(reachable),
-       ADDR_OBJ(reachable)+1, targetDS, 0))
+       ADDR_OBJ(reachable)+1, target_region, 0))
     ArgumentError("MIGRATE: Thread does not have exclusive access to objects");
   return obj;
 }
