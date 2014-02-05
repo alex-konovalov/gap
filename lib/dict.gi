@@ -366,6 +366,21 @@ InstallMethod( ListKeyEnumerator, "for list dictionaries",
       fi;
     end );
 
+##
+#M
+##
+InstallMethod( ViewObj,
+  "for dictionaries",
+  true,
+  [ IsDictionary ],
+  function( dict )
+    Print("<");
+    if IsLookupDictionary(dict) then
+      Print("lookup ");
+    fi;
+    Print("dictionary with ", Size(dict), " entries>");
+  end);
+
 # here starts the hash table bit by Gene and Scott
 
 ##  PERFORMANCE:
