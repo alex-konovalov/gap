@@ -27,6 +27,7 @@ ReadLib( "semicong.gi"  );
 ReadLib( "smgideal.gi"  );
 ReadLib( "monoid.gi"   );
 ReadLib( "grp.gi"      );
+ReadLib( "invsgp.gi"   );
 
 ReadLib( "addmagma.gi" );
 ReadLib( "addcoset.gi" );
@@ -222,6 +223,7 @@ ReadLib( "dict.gi"  );
 
 # files dealing with semigroups - second layer
 ReadLib( "trans.gi");
+ReadLib( "pperm.gi");
 ReadLib( "fastendo.gi");
 ReadLib( "fpsemi.gi");
 ReadLib( "fpmon.gi");
@@ -232,8 +234,8 @@ ReadLib( "adjoin.gi");
 ReadLib( "semirel.gi");
 ReadLib( "semitran.gi");
 ReadLib( "reesmat.gi");
-ReadLib("semiquo.gi");
-
+ReadLib( "semiquo.gi");
+ReadLib( "semipperm.gi");
 
 # prototyping utilities
 ReadLib( "proto.gi");

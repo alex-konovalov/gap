@@ -646,7 +646,20 @@ Obj             FuncHASHKEY_BAG (
 			(UInt4)INT_INTOBJ(opR), (void *) &hashout);
   return INTOBJ_INT(hashout % (1UL << 28));
 #endif
+}
 
+Int HASHKEY_BAG_NC (Obj obj, UInt4 seed, Int skip, int maxread){
+  #ifdef SYS_IS_64_BIT
+    UInt8 hashout[2];
+    MurmurHash3_x64_128 ( (const void *)((UChar *)ADDR_OBJ(obj)+skip), 
+                           maxread, seed, (void *) hashout);
+    return hashout[0] % (1UL << 60);
+  #else
+    UInt4 hashout;
+    MurmurHash3_x86_32 ( (const void *)((UChar *)ADDR_OBJ(obj)+skip), 
+                          maxread, seed, (void *) &hashout);
+    return hashout % (1UL << 28);
+  #endif
 }
 
 Obj FuncJenkinsHash(Obj self, Obj op, Obj size)

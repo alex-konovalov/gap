@@ -1149,11 +1149,8 @@ local o,e;
 end);
 
 InstallMethod(SparseIntKey,"transformations, arbitrary domain",true,
-  [IsObject,IsTransformationRep],0,
+  [IsObject,IsTransformation],
 function(d,t)
-local n,l;
-  n:=DegreeOfTransformation(t);
-  l:=List([1..n],i->n^(i-1));
-  return x->x![1]*l;
+    return x->NumberTransformation(t, DegreeOfTransformation(t));
 end);
 

@@ -32,6 +32,7 @@
 #define DEG_PERM4(perm)         (SIZE_OBJ(perm) / sizeof(UInt4))
 #define ADDR_PERM4(perm)        ((UInt4*)ADDR_OBJ(perm))
 
+#define IMAGE(i,pt,dg)  (((i) < (dg)) ? (pt)[(i)] : (i))
 
 /****************************************************************************
 **

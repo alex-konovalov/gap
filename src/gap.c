@@ -47,6 +47,8 @@
 #include        "bool.h"                /* booleans                        */
 #include        "macfloat.h"            /* machine doubles                 */
 #include        "permutat.h"            /* permutations                    */
+#include        "trans.h"               /* transformations                 */
+#include        "pperm.h"               /* partial perms                   */
 
 #include        "records.h"             /* generic records                 */
 #include        "precord.h"             /* plain records                   */
@@ -3311,6 +3313,8 @@ static InitInfoFunc InitFuncsBuiltinModules[] = {
     InitInfoCyc,
     InitInfoFinfield,
     InitInfoPermutat,
+    InitInfoTrans,
+    InitInfoPPerm,
     InitInfoBool,
     InitInfoMacfloat,
 

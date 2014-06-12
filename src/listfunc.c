@@ -35,7 +35,8 @@
 #include        "bool.h"                /* booleans                        */
 
 #include        "permutat.h"            /* permutations                    */
-#include        "finfield.h"            /* finite fields                   */
+#include        "trans.h"               /* transformations                 */
+#include        "pperm.h"               /* partial perms                   */
 
 #include        "listfunc.h"            /* functions for generic lists     */
 
@@ -1317,6 +1318,18 @@ Obj             FuncOnTuples (
         return OnTuplesPerm( tuple, elm );
     }
 
+    /* special case for transformations                                       */
+    if ( TNUM_OBJ(elm) == T_TRANS2 || TNUM_OBJ(elm) == T_TRANS4 ) {
+        PLAIN_LIST( tuple );
+        return OnTuplesTrans( tuple, elm );
+    }
+
+    /* special case for partial perms */
+    if ( TNUM_OBJ(elm) == T_PPERM2 || TNUM_OBJ(elm) == T_PPERM4 ) {
+        PLAIN_LIST( tuple );
+        return OnTuplesPPerm( tuple, elm );
+    }
+
     /* create a new bag for the result                                     */
     img = NEW_PLIST( IS_MUTABLE_OBJ(tuple) ? T_PLIST : T_PLIST+IMMUTABLE, LEN_LIST(tuple) );
     SET_LEN_PLIST( img, LEN_LIST(tuple) );
@@ -1372,12 +1385,22 @@ Obj             FuncOnSets (
       }
     }
         
-         
-
     /* special case for permutations                                       */
     if ( TNUM_OBJ(elm) == T_PERM2 || TNUM_OBJ(elm) == T_PERM4 ) {
         PLAIN_LIST( set );
         return OnSetsPerm( set, elm );
+    }
+
+    /* special case for transformations */
+    if ( TNUM_OBJ(elm) == T_TRANS2 || TNUM_OBJ(elm) == T_TRANS4 ){
+      PLAIN_LIST(set);
+      return OnSetsTrans( set, elm);
+    }
+    
+    /* special case for partial perms */
+    if ( TNUM_OBJ(elm) == T_PPERM2 || TNUM_OBJ(elm) == T_PPERM4 ){
+      PLAIN_LIST(set);
+      return OnSetsPPerm( set, elm);
     }
 
     /* compute the list of images                                          */
