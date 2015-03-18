@@ -345,6 +345,8 @@ DeclareRepresentation( "IsNonAtomicComponentObjectRep",
         IsComponentObjectRep, [], IS_OBJECT); 
 DeclareRepresentation( "IsReadOnlyPositionalObjectRep",
         IsPositionalObjectRep, [], IS_OBJECT); 
+DeclareRepresentation( "IsReadOnlyDataObjectRep",
+        IsDataObjectRep, [], IS_OBJECT); 
 DeclareRepresentation( "IsAtomicPositionalObjectRep",
         IsPositionalObjectRep, [], IS_OBJECT); 
 

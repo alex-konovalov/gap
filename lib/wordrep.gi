@@ -42,16 +42,16 @@
 ##
 
 DeclareRepresentation( "Is8BitsAssocWord",
-    IsSyllableAssocWordRep and IsDataObjectRep, [] );
+    IsSyllableAssocWordRep and IsReadOnlyDataObjectRep, [] );
 
 DeclareRepresentation( "Is16BitsAssocWord",
-    IsSyllableAssocWordRep and IsDataObjectRep, [] );
+    IsSyllableAssocWordRep and IsReadOnlyDataObjectRep, [] );
 
 DeclareRepresentation( "Is32BitsAssocWord",
-    IsSyllableAssocWordRep and IsDataObjectRep, [] );
+    IsSyllableAssocWordRep and IsReadOnlyDataObjectRep, [] );
 
 DeclareRepresentation( "IsInfBitsAssocWord",
-    IsSyllableAssocWordRep and IsPositionalObjectRep,[]);
+    IsSyllableAssocWordRep and IsReadOnlyDataObjectRep,[]);
 
 #############################################################################
 ##

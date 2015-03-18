@@ -712,6 +712,8 @@ BIND_GLOBAL( "IsAtomicPositionalObjectRepFlags",
         FLAGS_FILTER(IsAtomicPositionalObjectRep));
 BIND_GLOBAL( "IsReadOnlyPositionalObjectRepFlags", 
         FLAGS_FILTER(IsReadOnlyPositionalObjectRep));
+BIND_GLOBAL( "IsReadOnlyDataObjectRepFlags", 
+        FLAGS_FILTER(IsReadOnlyDataObjectRep));
         
 BIND_GLOBAL( "Objectify", function(type, obj)
     local flags;
@@ -738,7 +740,7 @@ BIND_GLOBAL( "Objectify", function(type, obj)
     if not IsNoImmediateMethodsObject(obj) then
       RunImmediateMethods( obj, type![2] );
     fi;
-  if IsReadOnlyPositionalObjectRep(obj) then
+  if IsReadOnlyPositionalObjectRep(obj) or IsReadOnlyDataObjectRep(obj) then
       MakeReadOnlyObj(obj);
   fi;
   return obj;
