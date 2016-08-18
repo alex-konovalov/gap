@@ -1,0 +1,19 @@
+# set clone depth
+clone_depth: 5                  # clone entire repository history if not defined
+
+install:
+  # by default, all script lines are interpreted as batch
+  - echo This is batch
+  # to run script as a PowerShell command prepend it with ps:
+  - ps: Write-Host 'This is PowerShell'
+  # batch commands start from cmd:
+  - cmd: echo This is batch again
+  - cmd: set MY_VAR=12345
+  - 'C:\cygwin\setup-x86.exe -qnNdO -R C:/cygwin -s http://cygwin.mirror.constant.com -l C:/cygwin/var/cache/setup -P autoconf -P automake -P bison -P libgmp-devel -P gcc-core -P gcc-g++ -P mingw-runtime -P mingw-binutils -P mingw-gcc-core -P mingw-gcc-g++ -P mingw-pthreads -P mingw-w32api -P libtool -P make -P python -P gettext-devel -P gettext -P intltool -P libiconv -P pkg-config -P git -P wget -P curl'
+
+# scripts that run after cloning repository
+build_script:
+  - 'C:/cygwin/bin/bash -lc "cd /cygdrive/c/projects/gap ; ./configure --with-gmp=system && make cygwin && make bootstrap-pkg-minimal"'
+
+test_script:
+  - 'C:/cygwin/bin/bash -lc "cd /cygdrive/c/projects/gap ; make testinstall"'
